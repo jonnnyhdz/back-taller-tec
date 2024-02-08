@@ -279,13 +279,23 @@ const estatusValue = estatus !== undefined ? estatus : null;
 app.get("/api/registros_mecanicos", (req, res) => {
   const sql = `
   SELECT
-  registros_mecanicos.*,
-  servicios.*,
-  piezas.*
+  registros_mecanicos.id AS id,
+  registros_mecanicos.nombreCliente,
+  registros_mecanicos.modeloVehiculo,
+  registros_mecanicos.comentarios,
+  registros_mecanicos.tiempo,
+  registros_mecanicos.costoTotal,
+  registros_mecanicos.estatus,
+  servicios.servicio_nombre,
+  servicios.descripcion AS servicio_descripcion,
+  servicios.precio AS servicio_precio,
+  piezas.nombre_pieza,
+  piezas.cantidad AS pieza_cantidad,
+  piezas.costo AS pieza_costo
 FROM registros_mecanicos
- JOIN servicios ON registros_mecanicos.servicio_id = servicios.id
- JOIN piezas ON registros_mecanicos.piezas_id = piezas.id
-GROUP BY registros_mecanicos.id;
+JOIN servicios ON registros_mecanicos.servicio_id = servicios.id
+JOIN piezas ON registros_mecanicos.piezas_id = piezas.id
+GROUP BY registros_mecanicos.id;;
   `;
 
   db.query(sql, (err, result) => {
