@@ -40,11 +40,11 @@ app.get("/api/registros", (req, res) => {
 
 // Ruta para guardar un nuevo registro en la tabla 'registros'
 app.post("/api/registros", (req, res) => {
-  const { nombre, correo, telefono } = req.body;
+  const { nombre, correo, telefono, contrasena } = req.body;
 
   const sql =
-    "INSERT INTO registros (nombre, correo, telefono) VALUES (?, ?, ?)";
-  db.query(sql, [nombre, correo, telefono], (err, result) => {
+    "INSERT INTO registros (nombre, correo, telefono, contrasena) VALUES (?, ?, ?, ?)";
+  db.query(sql, [nombre, correo, telefono, contrasena], (err, result) => {
     if (err) {
       console.error("Error al insertar en la base de datos:", err);
       res.status(500).json({ error: "Error interno del servidor" });
@@ -58,10 +58,11 @@ app.post("/api/registros", (req, res) => {
 // Ruta para actualizar un registro por ID
 app.put("/api/registros/:id", (req, res) => {
   const id = req.params.id;
-  const { nombre, correo, telefono } = req.body;
+  const { nombre, correo, telefono, contrasena } = req.body;
 
-  const sql = "UPDATE registros SET nombre=?, correo=?, telefono=? WHERE id=?";
-  db.query(sql, [nombre, correo, telefono, id], (err, result) => {
+  const sql =
+    "UPDATE registros SET nombre=?, correo=?, telefono=?, contrasena=? WHERE id=?";
+  db.query(sql, [nombre, correo, telefono, contrasena, id], (err, result) => {
     if (err) {
       console.error("Error al actualizar el registro:", err);
       res.status(500).json({ error: "Error interno del servidor" });
@@ -87,6 +88,161 @@ app.delete("/api/registros/:id", (req, res) => {
     }
   });
 });
+
+app.put("/api/multifactor/:id", (req, res) => {
+  const id = req.params.id;
+  const { activar } = req.body;
+
+  const sql = "UPDATE registros SET  multifactor=? WHERE id=?";
+  db.query(sql, [activar, id], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar el registro:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      console.log("Registro actualizado correctamente");
+      res.json({ success: true });
+    }
+  });
+});
+
+app.get("/api/verificarmultifactor/:correo", (req, res) => {
+  const correo = req.params.correo;
+  const password = req.query.password; // Suponiendo que la contraseña se pasa como un parámetro en la solicitud
+
+  // Realiza una consulta SELECT para obtener los valores de multifactor y contraseña
+  const selectSql = "SELECT correo, multifactor, contrasena FROM registros WHERE correo=?";
+  db.query(selectSql, [correo], (selectErr, selectResult) => {
+    if (selectErr) {
+      console.error("Error al realizar la consulta SELECT:", selectErr);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      // Verifica si se encontró un registro
+      if (selectResult.length === 0) {
+        res.status(404).json({ error: "Correo no encontrado" });
+        return;
+      }
+
+      // Obtiene los valores de multifactor, correo y contraseña
+      const { correo, multifactor, contrasena } = selectResult[0];
+       //console.log("cotraseña de la db"+contrasena);
+      // Verifica la contraseña
+      if (contrasena !== password) {
+        res.status(401).json({ error: "Contraseña incorrecta" });
+        return;
+      }
+
+      // Retorna los valores en un objeto JSON
+      res.json({ correo, multifactor });
+    }
+  });
+});
+
+
+app.put("/api/roles/:correo", (req, res) => {
+  const correo = req.params.correo;
+  const { activar2 } = req.body;
+
+  const sql = "UPDATE registros SET roles=? WHERE correo=?";
+  db.query(sql, [activar2, correo], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar el registro:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      console.log("Registro actualizado correctamente");
+      res.json({ success: true });
+    }
+  });
+});
+
+app.put("/api/proveedor/:correo", (req, res) => {
+  const correo = req.params.correo;
+  const { activar3, proveedor } = req.body;
+
+  const sql = "UPDATE registros SET proveedor=?, proveedor=? WHERE correo=?";
+  db.query(sql, [activar3, proveedor, correo], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar el registro:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      console.log("Registro actualizado correctamente");
+      res.json({ success: true });
+    }
+  });
+});
+
+app.get("/api/verificarroles/:correo/:token", (req, res) => {
+  const correo = req.params.correo;
+  const token = req.params.token;
+
+  // Realiza una consulta SELECT para obtener los valores de roles y codigo
+  const selectSql = "SELECT correo, roles, proveedor, codigo FROM registros WHERE correo=?";
+  db.query(selectSql, [correo], (selectErr, selectResult) => {
+    if (selectErr) {
+      console.error("Error al realizar la consulta SELECT:", selectErr);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      if (selectResult.length === 0) {
+        res.status(404).json({ error: "Correo no encontrado" });
+        return;
+      }
+
+      const { correo, roles, proveedor, codigo } = selectResult[0];
+
+      if (token == -1) {
+        res.json({ correo, roles, proveedor, codigo });
+      } else {
+        if (codigo == token) {
+          res.json({ correo, roles, proveedor, codigo });
+        } else {
+          res.status(401).json({ error: "Token incorrecto" });
+        }
+      }
+    }
+  });
+});
+
+
+
+
+
+
+app.get("/api/verificarproveedor/:correo", (req, res) => {
+  const correo = req.params.correo;
+
+  // Realiza una consulta SELECT para obtener los valores de correo y proveedor
+  const selectSql = "SELECT correo, proveedor FROM registros WHERE correo=?";
+  db.query(selectSql, [correo], (selectErr, selectResult) => {
+    if (selectErr) {
+      console.error("Error al realizar la consulta SELECT:", selectErr);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      // Verifica si se encontró un registro
+      if (selectResult.length === 0) {
+        res.status(404).json({ error: "Correo no encontrado" });
+        return;
+      }
+
+      // Obtiene los valores de correo y proveedor
+      const { correo, proveedor } = selectResult[0];
+
+      // Verifica si el valor de proveedor es 0 o 1
+      if (proveedor !== 0 && proveedor !== 1) {
+        res.status(401).json({ error: "Valor de proveedor no válido" });
+        return;
+      }
+
+      // Retorna los valores en un objeto JSON
+      res.json({ correo, proveedor });
+    }
+  });
+});
+
+
+
+
+
+
+
 
 // Ruta para obtener todos los registros de la tabla 'servicios'
 app.get("/api/servicios", (req, res) => {
@@ -226,50 +382,43 @@ app.post("/api/registros_mecanicos", async (req, res) => {
     piezas_id,
     comentarios,
     costoTotal,
-    estatus,
+    tiempo,
   } = req.body;
 
-  const nombreClienteValue = nombreCliente !== undefined ? nombreCliente : null;
-const modeloVehiculoValue = modeloVehiculo !== undefined ? modeloVehiculo : null;
-const servicio_idValue = servicio_id !== undefined ? servicio_id : null;
-const piezas_idValue = piezas_id !== undefined ? piezas_id : null;
-const comentariosValue = comentarios !== undefined ? comentarios : null;
-const costoTotalValue = costoTotal !== undefined ? costoTotal : null;
-const estatusValue = estatus !== undefined ? estatus : null;
-  // Asegúrate de tener el tiempo en tu nuevo registro, podrías ajustar esta lógica según tus necesidades
-  const tiempo = req.body.tiempo || 0;
+  // Establecer estatus como "En proceso" por defecto
+  const estatus = "En proceso";
 
   const sql =
-    "INSERT INTO registros_mecanicos (nombreCliente, modeloVehiculo, comentarios, tiempo, costoTotal, estatus, servicio_id, piezas_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    "INSERT INTO registros_mecanicos (nombreCliente, modeloVehiculo, servicio_id, piezas_id, comentarios, tiempo, costoTotal, estatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
   try {
-    await new Promise((resolve, reject) => {
-      db.query(
-        sql,
-        [
-          nombreClienteValue,
-          modeloVehiculoValue,
-          comentariosValue,
-          tiempo,
-          costoTotalValue,
-          estatusValue,
-          servicio_idValue,
-          piezas_idValue,
-        ],
-        (err, result) => {
-          if (err) {
-            console.error("Error al insertar en la base de datos:", err);
-            reject(err);
-          } else {
-            console.log("Registro insertado correctamente");
-            resolve(result);
-          }
+    await db.query(
+      sql,
+      [
+        nombreCliente,
+        modeloVehiculo,
+        servicio_id,
+        piezas_id,
+        comentarios,
+        tiempo,
+        costoTotal,
+        estatus,
+      ],
+      (err, result) => {
+        if (err) {
+          console.error("Error al insertar en la base de datos:", err);
+          res.status(500).json({
+            error: "Error interno del servidor",
+            fullError: err.message,
+          });
+        } else {
+          console.log("Registro insertado correctamente");
+          res.json({ success: true });
         }
-      );
-    });
-
-    res.json({ success: true });
+      }
+    );
   } catch (error) {
+    console.error("Error al insertar en la base de datos:", error);
     res
       .status(500)
       .json({ error: "Error interno del servidor", fullError: error.message });
@@ -278,24 +427,24 @@ const estatusValue = estatus !== undefined ? estatus : null;
 
 app.get("/api/registros_mecanicos", (req, res) => {
   const sql = `
-  SELECT
-  registros_mecanicos.id AS id,
-  registros_mecanicos.nombreCliente,
-  registros_mecanicos.modeloVehiculo,
-  registros_mecanicos.comentarios,
-  registros_mecanicos.tiempo,
-  registros_mecanicos.costoTotal,
-  registros_mecanicos.estatus,
-  servicios.servicio_nombre,
-  servicios.descripcion AS servicio_descripcion,
-  servicios.precio AS servicio_precio,
-  piezas.nombre_pieza,
-  piezas.cantidad AS pieza_cantidad,
-  piezas.costo AS pieza_costo
-FROM registros_mecanicos
-JOIN servicios ON registros_mecanicos.servicio_id = servicios.id
-JOIN piezas ON registros_mecanicos.piezas_id = piezas.id
-GROUP BY registros_mecanicos.id;;
+    SELECT
+      registros_mecanicos.id AS id,
+      registros_mecanicos.nombreCliente,
+      registros_mecanicos.modeloVehiculo,
+      registros_mecanicos.comentarios,
+      registros_mecanicos.tiempo,
+      registros_mecanicos.costoTotal,
+      registros_mecanicos.estatus,
+      servicios.servicio_nombre,
+      servicios.descripcion AS servicio_descripcion,
+      servicios.precio AS servicio_precio,
+      piezas.nombre_pieza,
+      piezas.cantidad AS pieza_cantidad,
+      piezas.costo AS pieza_costo
+    FROM registros_mecanicos
+    JOIN servicios ON registros_mecanicos.servicio_id = servicios.id
+    JOIN piezas ON registros_mecanicos.piezas_id = piezas.id
+    GROUP BY registros_mecanicos.id;
   `;
 
   db.query(sql, (err, result) => {
@@ -308,52 +457,12 @@ GROUP BY registros_mecanicos.id;;
   });
 });
 
-app.put("/api/registros_mecanicos/:id", (req, res) => {
-  const registroId = req.params.id;
-  const nuevosDatos = req.body;
-
-  const sql = `
-    UPDATE registros_mecanicos
-    SET 
-      nombreCliente = ?,
-      modeloVehiculo = ?,
-      servicio_id = ?,
-      piezas_id = ?,
-      comentarios = ?,
-      tiempo = ?,
-      costoTotal = ?,
-      estatus = ?
-    WHERE id = ?;
-  `;
-
-  const values = [
-    nuevosDatos.nombreCliente,
-    nuevosDatos.modeloVehiculo,
-    nuevosDatos.servicio_id,
-    nuevosDatos.piezas_id,
-    nuevosDatos.comentarios,
-    nuevosDatos.tiempo,
-    nuevosDatos.costoTotal,
-    nuevosDatos.estatus,
-    registroId,
-  ];
-
-  db.query(sql, values, (err, result) => {
-    if (err) {
-      console.error("Error al actualizar el registro:", err);
-      res.status(500).json({ error: "Error interno del servidor" });
-    } else {
-      res.json({ message: "Registro actualizado correctamente" });
-    }
-  });
-});
-
 app.delete("/api/registros_mecanicos/:id", (req, res) => {
   const registroId = req.params.id;
   console.log(`Intentando eliminar el registro con ID: ${registroId}`);
-  
+
   const sql = "DELETE FROM registros_mecanicos WHERE id = ?";
-  
+
   db.query(sql, [registroId], (err, result) => {
     if (err) {
       console.error("Error al eliminar el registro:", err);
@@ -370,6 +479,153 @@ app.delete("/api/registros_mecanicos/:id", (req, res) => {
   });
 });
 
+app.put("/api/registros_mecanicos/:id", async (req, res) => {
+  const registroId = req.params.id;
+  const nuevosDatos = req.body;
+
+  try {
+    const registroActual = await obtenerRegistroMecanico(registroId);
+
+    if (!registroActual) {
+      return res.status(404).json({ error: "Registro mecánico no encontrado" });
+    }
+
+    const { comentarios, servicios_adicionales, piezas_adicionales } =
+      nuevosDatos;
+
+    // Iniciar la transacción
+    db.beginTransaction(async (err) => {
+      if (err) {
+        console.error("Error al iniciar la transacción:", err);
+        return res.status(500).json({ error: "Error interno del servidor" });
+      }
+      console.log('Transacción confirmada');
+
+      try {
+        // Actualizar comentarios
+        const updateRegistroSQL = `
+          UPDATE registros_mecanicos
+          SET comentarios = ?
+          WHERE id = ?;
+        `;
+        await db.query(updateRegistroSQL, [comentarios, registroId]);
+
+        // Agregar nuevos servicios a la tabla registros_mecanicos
+        if (servicios_adicionales && servicios_adicionales.length > 0) {
+          for (const servicioId of servicios_adicionales) {
+            console.log("Insertando servicio con ID:", servicioId);
+            const insertServicioSQL = `
+              INSERT INTO registros_mecanicos_servicios (registro_mecanico_id, servicio_id)
+              VALUES (?, ?);
+            `;
+            await db.query(insertServicioSQL, [registroId, servicioId]);
+          }
+        }
+
+        // Agregar nuevas piezas a la tabla registros_mecanicos
+        if (piezas_adicionales && piezas_adicionales.length > 0) {
+          for (const piezaId of piezas_adicionales) {
+            console.log("Insertando pieza con ID:", piezaId);
+            const insertPiezaSQL = `
+              INSERT INTO registros_mecanicos_piezas (registro_mecanico_id, pieza_id)
+              VALUES (?, ?);
+            `;
+            await db.query(insertPiezaSQL, [registroId, piezaId]);
+          }
+        }
+
+        // Confirmar la transacción
+        db.commit((commitErr) => {
+          if (commitErr) {
+            console.error("Error al confirmar la transacción:", commitErr);
+            return res
+              .status(500)
+              .json({ error: "Error interno del servidor" });
+          }
+
+          res
+            .status(200)
+            .json({ message: "Registro actualizado correctamente" });
+        });
+      } catch (error) {
+        // Revertir la transacción en caso de error
+        db.rollback(() => {
+          console.error("Error al actualizar el registro mecánico:", error);
+          res.status(500).json({ error: "Error interno del servidor" });
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error al obtener el registro mecánico:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+const obtenerRegistroMecanico = (registroId) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT * FROM registros_mecanicos
+      WHERE id = ?;
+    `;
+
+    db.query(sql, [registroId], (err, result) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result[0]);
+      }
+    });
+  });
+};
+
+// Ruta para obtener servicios adicionales de un registro mecánico
+app.get(
+  "/api/registros_mecanicos_servicios/:registro_mecanico_id",
+  (req, res) => {
+    const { registro_mecanico_id } = req.params;
+    const sql = `
+    SELECT
+      servicios.servicio_nombre,
+      servicios.descripcion AS servicio_descripcion,
+      servicios.precio AS servicio_precio
+    FROM registros_mecanicos_servicios
+    JOIN servicios ON registros_mecanicos_servicios.servicio_id = servicios.id
+    WHERE registros_mecanicos_servicios.registro_mecanico_id = ?;
+  `;
+
+    db.query(sql, [registro_mecanico_id], (err, result) => {
+      if (err) {
+        console.error("Error al obtener servicios adicionales:", err);
+        res.status(500).json({ error: "Error interno del servidor" });
+      } else {
+        res.json(result);
+      }
+    });
+  }
+);
+
+// Ruta para obtener piezas adicionales de un registro mecánico
+app.get("/api/registros_mecanicos_piezas/:registro_mecanico_id", (req, res) => {
+  const { registro_mecanico_id } = req.params;
+  const sql = `
+    SELECT
+      piezas.nombre_pieza,
+      piezas.cantidad AS pieza_cantidad,
+      piezas.costo AS pieza_costo
+    FROM registros_mecanicos_piezas
+    JOIN piezas ON registros_mecanicos_piezas.pieza_id = piezas.id
+    WHERE registros_mecanicos_piezas.registro_mecanico_id = ?;
+  `;
+
+  db.query(sql, [registro_mecanico_id], (err, result) => {
+    if (err) {
+      console.error("Error al obtener piezas adicionales:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      res.json(result);
+    }
+  });
+});
 
 // Inicia el servidor
 app.listen(port, () => {
